@@ -12,7 +12,7 @@
     .input-group { margin-bottom: 15px; }
     label { display: block; font-weight: bold; margin-bottom: 5px; }
     input[type="text"], input[type="date"], input[type="password"] { width: 100%; padding: 8px; box-sizing: border-box; }
-    #editor-container { height: 450px; background: #fff; }
+    #editor-container { height: 400px; background: #fff; }
     
     #editor-container .ql-editor img {
       max-width: 100%;
@@ -22,10 +22,11 @@
 
     button { background: #333; color: #fff; border: none; padding: 12px 20px; font-size: 16px; cursor: pointer; margin-top: 15px; border-radius: 4px; }
     button:hover { background: #555; }
-    textarea { width: 100%; height: 200px; margin-top: 10px; font-family: monospace; }
+    textarea { width: 100%; height: 180px; margin-top: 10px; font-family: monospace; }
     
     #upload-status { font-weight: bold; color: #007acc; margin-top: 5px; display: none; }
     .config-box { background: #eef2f5; padding: 15px; border-radius: 6px; margin-bottom: 20px; }
+    .output-section { margin-top: 30px; }
   </style>
 </head>
 <body>
@@ -56,7 +57,7 @@
   </div>
 
   <div class="input-group">
-    <label>カテゴリ</label>
+    <label>カテゴリ（タグ）</label>
     <input type="text" id="category" value="Instruments / Guitar">
   </div>
 
@@ -67,7 +68,22 @@
 
   <div class="input-group">
     <label>記事タイトル</label>
-    <input type="text" id="title" placeholder="例：使い始めて3年半...本音レビュー">
+    <input type="text" id="title" placeholder="例：【機材コラム】Bacchus WINDY-STD/RSMを3年半愛用した感想">
+  </div>
+
+  <div class="input-group">
+    <label>記事URL（ファイル名）</label>
+    <input type="text" id="filename" placeholder="例：bacchus-windy.html">
+  </div>
+
+  <div class="input-group">
+    <label>サムネイル画像URL（本文に画像を挿入すると自動入力されるよ）</label>
+    <input type="text" id="thumbnail" placeholder="例：../resources/equipment/bacchus-windy-eyecatch.webp">
+  </div>
+
+  <div class="input-group">
+    <label>記事の概要文（indexページのカードに表示される説明文）</label>
+    <input type="text" id="excerpt" placeholder="例：使い始めて3年半になるエレキギター「Bacchus WINDY-STD/RSM BGM」を本音レビュー。">
   </div>
 
   <!-- 本文エディタ -->
@@ -79,8 +95,13 @@
 
   <button onclick="generateHTML()">完成したHTMLを出力する</button>
 
-  <h3>生成されたHTML（これを忍者ホームページに貼る）</h3>
-  <textarea id="output" readonly></textarea>
+  <div class="output-section">
+    <h3>① 個別記事用HTML（作成したHTMLファイルに保存）</h3>
+    <textarea id="output" readonly></textarea>
+
+    <h3>② index.html 追加用カードHTML（一覧ページの journalGrid の中に貼り付け）</h3>
+    <textarea id="output-card" readonly></textarea>
+  </div>
 
   <!-- Quill本体 ＆ リサイズ用ライブラリ -->
   <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
@@ -172,6 +193,13 @@
             
             var range = quill.getSelection(true);
             quill.insertEmbed(range.index, 'image', rawImageUrl);
+
+            // サムネイル入力欄が空なら最初の画像をサムネイルに自動設定
+            var thumbInput = document.getElementById('thumbnail');
+            if (!thumbInput.value) {
+              thumbInput.value = rawImageUrl;
+            }
+
             alert("画像のアップロードが完了しました！");
           } else {
             var errData = await response.json();
@@ -194,13 +222,18 @@
       });
     }
 
+    // HTML出力処理
     function generateHTML() {
       var category = document.getElementById('category').value;
       var rawDate = document.getElementById('date').value;
-      var date = rawDate.replace(/-/g, '.');
+      var dateDot = rawDate.replace(/-/g, '.'); // 2026.10.07 形式
       var title = document.getElementById('title').value;
+      var filename = document.getElementById('filename').value || 'article.html';
+      var thumbnail = document.getElementById('thumbnail').value || 'https://via.placeholder.com/600x338';
+      var excerpt = document.getElementById('excerpt').value;
       var bodyHTML = quill.root.innerHTML;
 
+      // ① 個別記事用HTML
       var finalHTML = `<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -220,7 +253,7 @@
             <div class="article-header">
                 <div class="article-meta">
                     <span class="article-tag">${category}</span>
-                    <span class="article-date">${date}</span>
+                    <span class="article-date">${dateDot}</span>
                 </div>
                 <h1 class="article-title">${title}</h1>
             </div>
@@ -283,7 +316,21 @@ ${bodyHTML}
 </body>
 </html>`.trim();
 
+      // ② index.html 追加用カードHTML
+      var cardHTML = `<a href="${filename}" class="glass-panel journal-card">
+    <div class="card-thumbnail-wrap">
+        <img src="${thumbnail}" alt="${title}" class="card-thumbnail">
+    </div>
+    <div class="card-content">
+        <span class="card-tag">${category}</span>
+        <h3 class="card-title">${title}</h3>
+        <p class="card-excerpt">${excerpt}</p>
+        <span class="card-date">${dateDot}</span>
+    </div>
+</a>`.trim();
+
       document.getElementById('output').value = finalHTML;
+      document.getElementById('output-card').value = cardHTML;
     }
   </script>
 </body>

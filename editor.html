@@ -15,10 +15,30 @@
     input[type="text"], input[type="date"], input[type="password"] { width: 100%; padding: 8px; box-sizing: border-box; font-size: 14px; }
     #editor-container { height: 400px; background: #fff; }
     
+    /* 画像のレスポンシブ対応 ＆ 余白調整 */
     #editor-container .ql-editor img {
       max-width: 100%;
       height: auto;
-      display: inline-block;
+      display: block;
+      margin: 10px auto;
+    }
+
+    /* エディタ内の改行・段落（<p>）の余白調整 */
+    #editor-container .ql-editor p {
+      margin-top: 0;
+      margin-bottom: 0.6em;
+      line-height: 1.7;
+    }
+
+    /* エディタ上の操作ガイド */
+    .editor-guide {
+      font-size: 0.85rem;
+      color: #495057;
+      background-color: #e9ecef;
+      padding: 8px 12px;
+      border-radius: 4px 4px 0 0;
+      border-left: 4px solid #007acc;
+      margin-bottom: 0;
     }
 
     .btn { background: #333; color: #fff; border: none; padding: 10px 18px; font-size: 14px; cursor: pointer; border-radius: 4px; }
@@ -142,6 +162,10 @@
   <!-- 本文エディタ -->
   <div class="input-group">
     <label>本文エディタ</label>
+    <!-- 操作ガイド表示 -->
+    <div class="editor-guide">
+      💡 <strong>改行のコツ:</strong> 行を変えたいときは <code>Shift + Enter</code>（詰めて改行） / 段落を変えたいときは <code>Enter</code>（少し余白が入る）
+    </div>
     <div id="editor-container"></div>
     <div id="upload-status">処理中...</div>
   </div>
@@ -205,7 +229,7 @@
       alert('設定を保存したよ！');
     }
 
-    // Quillの初期化
+    // Quillの初期化（videoボタンを追加）
     var quill = new Quill('#editor-container', {
       theme: 'snow',
       modules: {
@@ -216,9 +240,30 @@
           [{ 'color': [] }, { 'background': [] }],
           [{ 'align': [] }],
           [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-          ['image', 'link'],
+          ['image', 'video', 'link'], // 'video' を追加
           ['clean']
         ]
+      }
+    });
+
+    // YouTube URLの埋め込み形式変換関数
+    function formatYouTubeUrl(url) {
+      if (!url) return '';
+      const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+      const match = url.match(regExp);
+      return (match && match[2].length === 11) 
+        ? 'https://www.youtube.com/embed/' + match[2]
+        : url;
+    }
+
+    // YouTube挿入（videoハンドラ）の挙動カスタマイズ
+    quill.getModule('toolbar').addHandler('video', function() {
+      let url = prompt('YouTube動画のURLを入力してください:');
+      if (url) {
+        const embedUrl = formatYouTubeUrl(url);
+        const range = quill.getSelection(true);
+        quill.insertEmbed(range.index, 'video', embedUrl, Quill.sources.USER);
+        quill.setSelection(range.index + 1, Quill.sources.SILENT);
       }
     });
 
@@ -294,7 +339,6 @@
         statusEl.style.display = 'block';
 
         try {
-          // 画像を最大幅1200px・WebP変換圧縮
           var webpBlob = await compressAndConvertToWebP(file, 1200, 0.8);
 
           statusEl.innerText = "画像をGitHubへアップロード中...";
@@ -325,7 +369,6 @@
             var range = quill.getSelection(true);
             quill.insertEmbed(range.index, 'image', rawImageUrl);
 
-            // サムネイル入力欄が空なら最初の画像をサムネイルに自動設定
             var thumbInput = document.getElementById('thumbnail');
             if (!thumbInput.value) {
               thumbInput.value = rawImageUrl;
@@ -382,7 +425,6 @@
       try {
         var url = `https://api.github.com/repos/${user}/${repo}/contents/${filePath}`;
 
-        // 既存ファイルが存在するか確認して sha を取得
         var sha = null;
         var checkRes = await fetch(url, {
           headers: { 'Authorization': `token ${token}` }
@@ -633,6 +675,34 @@
       closeImageLibraryModal();
     }
 
+    // HTML文字列のインデント整形関数
+    function indentHTML(html) {
+      var tab = '    '; // スペース4つ
+      var result = '';
+      var indent = '';
+
+      // タグごとに分割
+      var tokens = html.replace(/>\s*</g, '><').split(/(?=<)|(?<=>)/);
+
+      tokens.forEach(function(token) {
+        if (!token.trim()) return;
+
+        // 閉じタグの場合、事前にインデントを減らす
+        if (token.match(/^<\//)) {
+          indent = indent.substring(tab.length);
+        }
+
+        result += indent + token + '\n';
+
+        // 開始タグ（自閉タグやimg, brなどを除く）の場合、インデントを増やす
+        if (token.match(/^<[^\/]/) && !token.match(/<(?:\/|img|br|hr|input|source)/i) && !token.endsWith('/>')) {
+          indent += tab;
+        }
+      });
+
+      return result.trim();
+    }
+
     // --- HTML出力 ＆ ファイルダウンロード ---
     function generateHTML() {
       var category = document.getElementById('category').value;
@@ -642,7 +712,13 @@
       var filename = document.getElementById('filename').value || 'article.html';
       var thumbnail = document.getElementById('thumbnail').value || 'https://via.placeholder.com/600x338';
       var excerpt = document.getElementById('excerpt').value;
-      var bodyHTML = quill.root.innerHTML;
+      
+      // 本文HTMLをきれいにインデント整形
+      var bodyHTMLRaw = quill.root.innerHTML;
+      var indentedBodyHTML = indentHTML(bodyHTMLRaw);
+      
+      // article-bodyの中に配置するため、1段インデントを揃える
+      var formattedBodyHTML = indentedBodyHTML.split('\n').map(line => '                ' + line).join('\n');
 
       // ① 個別記事用HTML
       var finalHTML = `<!DOCTYPE html>
@@ -675,7 +751,7 @@
             </div>
             
             <div class="glass-panel article-body">
-${bodyHTML}
+${formattedBodyHTML}
             </div>
 
             <div class="back-link-area">

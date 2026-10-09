@@ -229,17 +229,6 @@
       alert('設定を保存したよ！');
     }
 
-    // ★ Quillのリンク機能で target="_blank" を付与しないようにカスタマイズ
-    var Link = Quill.import('formats/link');
-    class CustomLink extends Link {
-      static create(value) {
-        let node = super.create(value);
-        node.removeAttribute('target');
-        return node;
-      }
-    }
-    Quill.register(CustomLink, true);
-
     // Quillの初期化
     var quill = new Quill('#editor-container', {
       theme: 'snow',
@@ -721,8 +710,8 @@
       var thumbnail = document.getElementById('thumbnail').value || 'https://via.placeholder.com/600x338';
       var excerpt = document.getElementById('excerpt').value;
       
-      // ★ 過去に作られたHTMLやエディタの既存HTMLから target="_blank" を除去するクリーニング処理
-      var bodyHTMLRaw = quill.root.innerHTML.replace(/\s*target="_blank"/gi, '');
+      // ★ 強力な正規表現で target 属性（target="_blank" や target='_blank' 等）をすべて消去
+      var bodyHTMLRaw = quill.root.innerHTML.replace(/\s*target=(['"])[^'"]*\1/gi, '');
       var indentedBodyHTML = indentHTML(bodyHTMLRaw);
       
       var formattedBodyHTML = indentedBodyHTML.split('\n').map(line => '                ' + line).join('\n');
@@ -739,7 +728,7 @@
     <link rel="stylesheet" href="../style.css">
     <link rel="stylesheet" href="style.css">
     <style>
-        /* 記事本文内のリンクスタイル指定（青色にならず、周囲と同じ文字色で下線のみ表示） */
+        /* 本文内のリンク指定（周囲と同じ文字色で下線のみ表示） */
         .article-body a {
             color: inherit;
             text-decoration: underline;

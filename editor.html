@@ -229,6 +229,17 @@
       alert('設定を保存したよ！');
     }
 
+    // ★ リンクの target="_blank" を無効化する設定
+    var Link = Quill.import('formats/link');
+    class CustomLink extends Link {
+      static create(value) {
+        let node = super.create(value);
+        node.removeAttribute('target'); // 別窓で開く属性を削除
+        return node;
+      }
+    }
+    Quill.register(CustomLink, true);
+
     // Quillの初期化（videoボタンを追加）
     var quill = new Quill('#editor-container', {
       theme: 'snow',
@@ -731,6 +742,13 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;700&family=Shippori+Mincho:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../style.css">
     <link rel="stylesheet" href="style.css">
+    <style>
+        /* 本文内のリンク指定（色を本文と同じにし、下線のみ表示） */
+        .article-body a {
+            color: inherit;
+            text-decoration: underline;
+        }
+    </style>
 </head>
 <body>
     <div id="common-header"></div>
